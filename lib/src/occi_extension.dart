@@ -9,6 +9,8 @@ import 'package:ffi/ffi.dart';
 
 import 'dart:convert';
 
+import 'models/typedef.dart';
+
 class SqlException implements Exception {
   int _code;
   String _desc;
@@ -41,9 +43,11 @@ class Environment {
       String username, String password, String connStr) {
     final createConnection = _lib.lookupFunction<
         Pointer Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>),
-        Pointer Function(
-            Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>)>('OracleEnvironment_createConnection');
-    return createConnection(username.toNativeUtf8(), password.toNativeUtf8(), connStr.toNativeUtf8());
+        Pointer Function(Pointer<Utf8>, Pointer<Utf8>,
+            Pointer<Utf8>)>('OracleEnvironment_createConnection');
+
+    return createConnection(username.toNativeUtf8(), password.toNativeUtf8(),
+        connStr.toNativeUtf8());
   }
 
   void terminateConnection(Connection conn) => conn.terminate();
@@ -106,33 +110,83 @@ class Connection {
     }
   }
 
-  String getUsername() native 'OracleConnection_getUsername';
-  String getConnectionString() native 'OracleConnection_getConnectionString';
-  String changePassword(String oldpass, String newpass)
-      native 'OracleConnection_changePassword';
-  void terminate() native 'OracleConnection_terminate';
+  String getUsername() {
+    final getUsername = _lib
+        .lookup<NativeFunction<NativeGetUsername>>(
+            'OracleConnection_getUsername')
+        .asFunction<DartGetUsername>();
+
+    return getUsername().toDartString();
+  }
+
+  // String getUsername() native 'OracleConnection_getUsername';
+  // String getConnectionString() native 'OracleConnection_getConnectionString';
+  String getConnectionString() {
+    final getConnectionString = _lib
+        .lookup<NativeFunction<NativeGetConnectionString>>(
+            'OracleConnection_getConnectionString')
+        .asFunction<DartGetConnectionString>();
+
+    return getConnectionString().toDartString();
+  }
+
+  void changePassword(String oldpass, String newpass) {
+    final changePassword = _lib
+        .lookup<NativeFunction<NativeChangePassword>>(
+            'OracleConnection_changePassword')
+        .asFunction<DartChangePassword>();
+
+    changePassword(oldpass.toNativeUtf8(), newpass.toNativeUtf8());
+  }
+
+  void terminate() {
+    final terminate = _lib
+        .lookup<NativeFunction<NativeTerminate>>('OracleConnection_terminate')
+        .asFunction<DartTerminate>();
+
+    terminate();
+  }
 
   Statement execute(String sql, [dynamic args]) {
     var stmt = createStatement(sql);
     if (args is List)
-      _bindArgs(stmt, args);
+      _bindArgs(stmt, args as List<Object>);
     else if (args is Map) _bindMap(stmt, args);
     stmt.execute();
     return stmt;
   }
 
-  ResultSet executeQuery(String sql, [List<Object> args]) {
+  ResultSet executeQuery(String sql, [List<Object>? args]) {
     var stmt = createStatement(sql);
     _bindArgs(stmt, args);
     return stmt.executeQuery();
   }
 
-  void commit() native 'OracleConnection_commit';
+  void commit() {
+    final commit = _lib
+        .lookup<NativeFunction<NativeCommit>>('OracleConnection_commit')
+        .asFunction<DartCommit>();
 
-  void rollback() native 'OracleConnection_rollback';
+    commit();
+  }
 
-  Statement createStatement(String sql)
-      native 'OracleConnection_createStatement';
+  void rollback() {
+    final rollback = _lib
+        .lookup<NativeFunction<NativeRollback>>('OracleConnection_rollback')
+        .asFunction<DartRollback>();
+
+    rollback();
+  }
+
+  Statement createStatement(String sql) {
+    final createStatement = _lib
+        .lookup<NativeFunction<NativeCreateStatement>>(
+            'OracleConnection_createStatement')
+        .asFunction<DartCreateStatement>();
+
+    Pointer stmtPointer = createStatement(sql.toNativeUtf8());
+    return Statement(stmtPointer);
+  }
 }
 
 enum StatementStatus {
@@ -148,7 +202,7 @@ class Statement {
   late final Pointer _ptr;
   late DynamicLibrary _lib;
 
-  Statement(this._ptr){};
+  Statement(this._ptr);
 
   String get sql {
     final cGetSql = _lib.lookupFunction<Pointer Function(Pointer),
@@ -164,52 +218,147 @@ class Statement {
     calloc.free(cNewSql);
   }
 
-  void setPrefetchRowCount(int val)
-      native 'OracleStatement_setPrefetchRowCount';
+  void setPrefetchRowCount(int val) {
+    final setPrefetchRowCount = _lib
+        .lookup<NativeFunction<NativeSetPrefetchRowCount>>(
+            'OracleStatement_setPrefetchRowCount')
+        .asFunction<DartSetPrefetchRowCount>();
 
-  int _execute() native 'OracleStatement_execute';
+    setPrefetchRowCount(val);
+  }
+
+  int _execute() {
+    final execute = _lib
+        .lookup<NativeFunction<NativeExecute>>('OracleStatement_execute')
+        .asFunction<DartExecute>();
+
+    return execute();
+  }
 
   StatementStatus execute() => StatementStatus.values[_execute()];
 
-  ResultSet executeQuery() native 'OracleStatement_executeQuery';
+  ResultSet executeQuery() {
+    final executeQuery = _lib
+        .lookup<NativeFunction<NativeExecuteQuery>>(
+            'OracleStatement_executeQuery')
+        .asFunction<DartExecuteQuery>();
 
-  ResultSet getResultSet() native 'OracleStatement_getResultSet';
+    Pointer resultSetPointer = executeQuery();
+    return ResultSet(resultSetPointer);
+  }
 
-  int executeUpdate() native 'OracleStatement_executeUpdate';
+  ResultSet getResultSet() {
+    final getResultSet = _lib
+        .lookup<NativeFunction<NativeGetResultSet>>(
+            'OracleStatement_getResultSet')
+        .asFunction<DartGetResultSet>();
 
-  int _status() native 'OracleStatement_status';
+    Pointer resultSetPointer = getResultSet();
+    return ResultSet(resultSetPointer);
+  }
+
+  int executeUpdate() {
+    final executeUpdate = _lib
+        .lookup<NativeFunction<NativeExecuteUpdate>>(
+            'OracleStatement_executeUpdate')
+        .asFunction<DartExecuteUpdate>();
+
+    return executeUpdate();
+  }
+
+//
+  int _status() {
+    final status = _lib
+        .lookup<NativeFunction<NativeStatus>>('OracleStatement_status')
+        .asFunction<DartStatus>();
+
+    return status();
+  }
+
+  void _setNum(int index, double? number) {
+    final setNum = _lib
+        .lookup<NativeFunction<NativeSetNum>>('OracleStatement_setNum')
+        .asFunction<DartSetNum>();
+
+    setNum(index, number ?? 0.0);
+  }
+
+  void setInt(int index, int integer) {
+    final setInt = _lib
+        .lookup<NativeFunction<NativeSetInt>>('OracleStatement_setInt')
+        .asFunction<DartSetInt>();
+
+    setInt(index, integer);
+  }
+
+  void setDouble(int index, double daable) {
+    final setDouble = _lib
+        .lookup<NativeFunction<NativeSetDouble>>('OracleStatement_setDouble')
+        .asFunction<DartSetDouble>();
+
+    setDouble(index, daable);
+  }
+
+  void setDate(int index, DateTime date) {
+    final setDate = _lib
+        .lookup<NativeFunction<NativeSetDate>>('OracleStatement_setDate')
+        .asFunction<DartSetDate>();
+
+    setDate(index, date.toIso8601String().toNativeUtf8());
+  }
+
+  void setTimestamp(int index, DateTime timestamp) {
+    final setTimestamp = _lib
+        .lookup<NativeFunction<NativeSetTimestamp>>(
+            'OracleStatement_setTimestamp')
+        .asFunction<DartSetTimestamp>();
+
+    setTimestamp(index, timestamp.toIso8601String().toNativeUtf8());
+  }
+
+  void setBytes(int index, List<int> bytes) {
+    final setBytes = _lib
+        .lookup<NativeFunction<NativeSetBytes>>('OracleStatement_setBytes')
+        .asFunction<DartSetBytes>();
+
+    final pointer = allocate<Uint8>(count: bytes.length);
+    for (var i = 0; i < bytes.length; i++) {
+      pointer[i] = bytes[i];
+    }
+
+    setBytes(index, pointer);
+
+    free(pointer);
+  }
+
+  void setString(int index, String string) {
+    final setString = _lib
+        .lookup<NativeFunction<NativeSetString>>('OracleStatement_setString')
+        .asFunction<DartSetString>();
+
+    final pointer = string.toNativeUtf8();
+
+    setString(index, pointer);
+
+    calloc.free(pointer);
+  }
+  // Set a DATE column
+  //
+  // Note: Because Oracle's DATE type does not support timezones
+  // The timezone information of the given [date] is ignored
+  // Set a TIMESTAMP column
+  //
+  // Note: Because Oracle's TIMESTAMP type is timezone-aware,
+  // the timezone of the [timestamp] is used.
 
   StatementStatus status() => StatementStatus.values[_status()];
 
-  void setBytes(int index, List<int> bytes) native 'OracleStatement_setBytes';
-
-  void setString(int index, String string) native 'OracleStatement_setString';
-
-  void setNum(int index, num number) {
+  void setNum(int index, num? number) {
     if (number == null)
       _setNum(index, null);
     else
       _setNum(index, number.toDouble());
   }
-
-  void _setNum(int index, double number) native 'OracleStatement_setNum';
-
-  void setInt(int index, int integer) native 'OracleStatement_setInt';
-
-  void setDouble(int index, double daable) native 'OracleStatement_setDouble';
-
-  // Set a DATE column
-  //
-  // Note: Because Oracle's DATE type does not support timezones
-  // The timezone information of the given [date] is ignored
-  void setDate(int index, DateTime date) native 'OracleStatement_setDate';
-
-  // Set a TIMESTAMP column
-  //
-  // Note: Because Oracle's TIMESTAMP type is timezone-aware,
-  // the timezone of the [timestamp] is used.
-  void setTimestamp(int index, DateTime timestamp)
-      native 'OracleStatement_setTimestamp';
 
   void setDynamic(int index, dynamic input) {
     if (input is int) {
@@ -263,17 +412,53 @@ class Statement {
 
 class ResultSet {
   ResultSet._();
+  final _lib = DynamicLibrary.open('path_to_your_library');
 
-  List<ColumnMetadata> getColumnListMetadata()
-      native 'OracleResultSet_getColumnListMetadata';
+  List<ColumnMetadata> getColumnListMetadata() {
+    final getColumnListMetadata = _lib
+        .lookup<NativeFunction<NativeGetColumnListMetadata>>(
+            'OracleResultSet_getColumnListMetadata')
+        .asFunction<DartGetColumnListMetadata>();
 
-  dynamic cancel() native 'OracleResultSet_cancel';
+    Pointer columnListPointer = getColumnListMetadata();
+    // Aqui você precisa implementar a lógica para converter o ponteiro em uma lista de ColumnMetadata
+    // ...
+  }
 
-  BFile getBFile(int index) native 'OracleResultSet_getBFile';
+  dynamic cancel() {
+    final cancel = _lib
+        .lookup<NativeFunction<NativeCancel>>('OracleResultSet_cancel')
+        .asFunction<DartCancel>();
 
-  Blob getBlob(int index) native 'OracleResultSet_getBlob';
+    cancel();
+  }
 
-  Clob getClob(int index) native 'OracleResultSet_getClob';
+  BFile getBFile(int index) {
+    final getBFile = _lib
+        .lookup<NativeFunction<NativeGetBFile>>('OracleResultSet_getBFile')
+        .asFunction<DartGetBFile>();
+
+    Pointer bFilePointer = getBFile(index);
+    return BFile(bFilePointer);
+  }
+
+  Blob getBlob(int index) {
+    final getBlob = _lib
+        .lookup<NativeFunction<NativeGetBlob>>('OracleResultSet_getBlob')
+        .asFunction<DartGetBlob>();
+
+    Pointer blobPointer = getBlob(index);
+    return Blob(blobPointer);
+  }
+
+  Clob getClob(int index) {
+    final getClob = _lib
+        .lookup<NativeFunction<NativeGetClob>>('OracleResultSet_getClob')
+        .asFunction<DartGetClob>();
+
+    Pointer clobPointer = getClob(index);
+    return Clob(clobPointer);
+  }
 
   dynamic get(int index) {
     var md = getColumnListMetadata();
@@ -293,35 +478,89 @@ class ResultSet {
     return getString(index);
   }
 
-  List<int> getBytes(int index) native 'OracleResultSet_getBytes';
+  List<int> getBytes(int index) {
+    final getBytes = _lib
+        .lookup<NativeFunction<NativeGetBytes>>('OracleResultSet_getBytes')
+        .asFunction<DartGetBytes>();
 
-  String getString(int index) native 'OracleResultSet_getString';
-
-  num getNum(int index) native 'OracleResultSet_getNum';
-
-  int getInt(int index) native 'OracleResultSet_getInt';
-
-  double getDouble(int index) native 'OracleResultSet_getDouble';
-
-  // Get a [DateTime] at a given [index]
-  //
-  // Note: This method will return a [DateTime] with the local timezone
-  // **without** performing any timezone offset calculation
-  DateTime getDate(int index) native 'OracleResultSet_getDate';
-
-  // Get a [DateTime] at a given [index]
-  //
-  // Note: This method will return a [new DateTime.utc]. If timezone information
-  // is provided by Oracle, the UTC offset will be used.
-  DateTime getTimestamp(int index) native 'OracleResultSet_getTimestamp';
-
-  dynamic getRowID() native 'OracleResultSet_getRowID';
-
-  bool next([int numberOfRows = 1]) {
-    _next(numberOfRows);
+    Pointer<Uint8> bytesPointer = getBytes(index);
+    // Aqui você precisa implementar a lógica para converter o ponteiro em uma lista de inteiros
+    // ...
   }
 
-  bool _next(int numberOfRows) native 'OracleResultSet_next';
+  String getString(int index) {
+    final getString = _lib
+        .lookup<NativeFunction<NativeGetString>>('OracleResultSet_getString')
+        .asFunction<DartGetString>();
+
+    Pointer<Utf8> stringPointer = getString(index);
+    return stringPointer.toDartString();
+  }
+
+  num getNum(int index) {
+    final getNum = _lib
+        .lookup<NativeFunction<NativeGetNum>>('OracleResultSet_getNum')
+        .asFunction<DartGetNum>();
+
+    return getNum(index);
+  }
+
+  int getInt(int index) {
+    final getInt = _lib
+        .lookup<NativeFunction<NativeGetInt>>('OracleResultSet_getInt')
+        .asFunction<DartGetInt>();
+
+    return getInt(index);
+  }
+
+  double getDouble(int index) {
+    final getDouble = _lib
+        .lookup<NativeFunction<NativeGetDouble>>('OracleResultSet_getDouble')
+        .asFunction<DartGetDouble>();
+
+    return getDouble(index);
+  }
+
+  DateTime getDate(int index) {
+    final getDate = _lib
+        .lookup<NativeFunction<NativeGetDate>>('OracleResultSet_getDate')
+        .asFunction<DartGetDate>();
+
+    Pointer<Utf8> datePointer = getDate(index);
+    return DateTime.parse(datePointer.toDartString());
+  }
+
+  DateTime getTimestamp(int index) {
+    final getTimestamp = _lib
+        .lookup<NativeFunction<NativeGetTimestamp>>(
+            'OracleResultSet_getTimestamp')
+        .asFunction<DartGetTimestamp>();
+
+    Pointer<Utf8> timestampPointer = getTimestamp(index);
+    return DateTime.parse(timestampPointer.toDartString());
+  }
+
+  dynamic getRowID() {
+    final getRowID = _lib
+        .lookup<NativeFunction<NativeGetRowID>>('OracleResultSet_getRowID')
+        .asFunction<DartGetRowID>();
+
+    Pointer rowIDPointer = getRowID();
+    // Aqui você precisa implementar a lógica para converter o ponteiro em um objeto RowID
+    // ...
+  }
+
+  bool _next(int numberOfRows) {
+    final next = _lib
+        .lookup<NativeFunction<NativeNext>>('OracleResultSet_next')
+        .asFunction<DartNext>();
+
+    return next(numberOfRows) != 0;
+  }
+
+  bool next([int numberOfRows = 1]) {
+    return _next(numberOfRows);
+  }
 
   Map<String, dynamic> row() {
     Map<String, dynamic> map = new Map<String, dynamic>();
@@ -331,13 +570,31 @@ class ResultSet {
     }
     return map;
   }
+  // Get a [DateTime] at a given [index]
+  //
+  // Note: This method will return a [DateTime] with the local timezone
+  // **without** performing any timezone offset calculation
+  // Get a [DateTime] at a given [index]
+  //
+  // Note: This method will return a [new DateTime.utc]. If timezone information
+  // is provided by Oracle, the UTC offset will be used.
 }
 
 class BFile {
-  List<int> get bytes native 'OracleBFile_getBytes';
+  final _lib = DynamicLibrary.open('path_to_your_library');
+  List<int> get bytes {
+    final getBytes = _lib
+        .lookup<NativeFunction<NativeGetBytes>>('OracleBFile_getBytes')
+        .asFunction<DartGetBytes>();
+
+    Pointer<Uint8> bytesPointer = getBytes();
+    return [];
+    // Aqui você precisa implementar a lógica para converter o ponteiro em uma lista de inteiros
+    // ...
+  }
 }
 
-class Blob {
+class Blob extends Struct {
   Blob._();
 
   void append(Blob b) native 'OracleBlob_append';
@@ -513,7 +770,6 @@ class _MetadataAttrs {
   static const ATTR_IS_TYPED = const _MetadataAttrs(131);
   static const ATTR_DURATION = const _MetadataAttrs(132);
   static const ATTR_COLLECTION_ELEMENT = const _MetadataAttrs(227);
-  static const ATTR_RDBA = const _MetadataAttrs(104);
   static const ATTR_TABLESPACE = const _MetadataAttrs(126);
   static const ATTR_CLUSTERED = const _MetadataAttrs(105);
   static const ATTR_PARTITIONED = const _MetadataAttrs(106);
