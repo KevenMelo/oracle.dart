@@ -3,7 +3,10 @@
 
 library oracle.src.occi_extension;
 
-import 'dart-ext:occi_extension';
+import 'dart:ffi';
+import 'package:ffi/ffi.dart';
+// import 'dart-ext:occi_extension';
+
 import 'dart:convert';
 
 class SqlException implements Exception {
@@ -21,22 +24,48 @@ class SqlException implements Exception {
 }
 
 class Environment {
+  late DynamicLibrary _lib;
+
   Environment() {
+    _lib = DynamicLibrary.open('path_to_your_library');
     _init();
   }
 
-  void _init() native 'OracleEnvironment_init';
+  void _init() {
+    final init = _lib.lookupFunction<Void Function(), void Function()>(
+        'OracleEnvironment_init');
+    init();
+  }
 
-  Connection createConnection(String username, String password, String connStr)
-      native 'OracleEnvironment_createConnection';
+  Connection createConnection(
+      String username, String password, String connStr) {
+    final createConnection = _lib.lookupFunction<
+        Pointer Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>),
+        Pointer Function(
+            Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>)>('OracleEnvironment_createConnection');
+    return createConnection(username.toNativeUtf8(), password.toNativeUtf8(), connStr.toNativeUtf8());
+  }
 
   void terminateConnection(Connection conn) => conn.terminate();
 }
 
-class Connection {
-  String _connectionString;
-  String _username;
+// class Environment {
+//   Environment() {
+//     _init();
+//   }
 
+//   void _init() native 'OracleEnvironment_init';
+
+//   Connection createConnection(String username, String password, String connStr)
+//       native 'OracleEnvironment_createConnection';
+
+//   void terminateConnection(Connection conn) => conn.terminate();
+// }
+
+class Connection {
+  String? _connectionString;
+  String? _username;
+  final _lib = DynamicLibrary.open('path_to_your_library');
   factory Connection(String username, String password, String connString) {
     var env = new Environment();
     return env.createConnection(username, password, connString);
@@ -44,7 +73,7 @@ class Connection {
 
   Connection._();
 
-  void _bindArgs(Statement stmt, [List<Object> args]) {
+  void _bindArgs(Statement stmt, [List<Object>? args]) {
     if (args == null) {
       return;
     }
@@ -55,23 +84,22 @@ class Connection {
 
       switch (arg.runtimeType) {
         case String:
-          stmt.setString(param_i, arg);
+          stmt.setString(param_i, arg as String);
           break;
         case int:
-          stmt.setInt(param_i, arg);
+          stmt.setInt(param_i, arg as int);
           break;
         case double:
-          stmt.setDouble(param_i, arg);
+          stmt.setDouble(param_i, arg as double);
           break;
         case DateTime:
-          // TODO: Will setTimestamp work on a DATETIME column?
-          stmt.setTimestamp(param_i, arg);
+          stmt.setTimestamp(param_i, arg as DateTime);
           break;
       }
     }
   }
 
-  void _bindMap(Statement stmt, [Map args]) {
+  void _bindMap(Statement stmt, [Map? args]) {
     if (args == null) return;
     for (var key in args.keys) {
       stmt.bind(key, args[key]);
@@ -86,7 +114,8 @@ class Connection {
 
   Statement execute(String sql, [dynamic args]) {
     var stmt = createStatement(sql);
-    if (args is List) _bindArgs(stmt, args);
+    if (args is List)
+      _bindArgs(stmt, args);
     else if (args is Map) _bindMap(stmt, args);
     stmt.execute();
     return stmt;
@@ -116,11 +145,24 @@ enum StatementStatus {
 }
 
 class Statement {
-  Statement._();
+  late final Pointer _ptr;
+  late DynamicLibrary _lib;
 
-  String get sql native 'OracleStatement_getSql';
+  Statement(this._ptr){};
 
-  void set sql(String newSql) native 'OracleStatement_setSql';
+  String get sql {
+    final cGetSql = _lib.lookupFunction<Pointer Function(Pointer),
+        Pointer Function(Pointer)>('OracleStatement_getSql');
+    return cGetSql(_ptr).cast<Utf8>().toDartString();
+  }
+
+  set sql(String newSql) {
+    final cSetSql = _lib.lookupFunction<Void Function(Pointer, Pointer),
+        void Function(Pointer, Pointer)>('OracleStatement_setSql');
+    final cNewSql = newSql.toNativeUtf8();
+    cSetSql(_ptr, cNewSql);
+    calloc.free(cNewSql);
+  }
 
   void setPrefetchRowCount(int val)
       native 'OracleStatement_setPrefetchRowCount';
@@ -144,8 +186,10 @@ class Statement {
   void setString(int index, String string) native 'OracleStatement_setString';
 
   void setNum(int index, num number) {
-    if (number == null) _setNum(index, null);
-    else _setNum(index, number.toDouble());
+    if (number == null)
+      _setNum(index, null);
+    else
+      _setNum(index, number.toDouble());
   }
 
   void _setNum(int index, double number) native 'OracleStatement_setNum';
@@ -198,7 +242,8 @@ class Statement {
   }
 
   void bind(dynamic bind, dynamic input) {
-    if (bind is int || bind is num) setDynamic(bind, input);
+    if (bind is int || bind is num)
+      setDynamic(bind, input);
     else if (bind is String) {
       RegExp exp = new RegExp(r"[:][A-Za-z0-9_]+");
       Iterable<Match> matches = exp.allMatches(this.sql);
@@ -211,7 +256,8 @@ class Statement {
           }
         }
       }
-    } else throw ("bind name is of unsupported type");
+    } else
+      throw ("bind name is of unsupported type");
   }
 }
 

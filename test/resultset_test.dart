@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:oracle/oracle.dart' as oracle;
 import 'package:test/test.dart';
-import 'package:collection/equality.dart';
 import 'helpers.dart';
 
 const MAX_DELTA = 0.0001;
