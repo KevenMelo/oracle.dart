@@ -594,52 +594,176 @@ class BFile {
   }
 }
 
-class Blob extends Struct {
+
+base class Blob extends Struct {
+  @Int64()
+  external int someField;
+
   Blob._();
 
-  void append(Blob b) native 'OracleBlob_append';
+  void append(Blob b) {
+final _lib = DynamicLibrary.open("liboracle.so");
+    final append = _lib.lookupFunction<
+        Void Function(Pointer<Blob>, Pointer<Blob>),
+        void Function(Pointer<Blob>, Pointer<Blob>)>('OracleBlob_append');
+    append(this as Pointer<Blob>, b as Pointer<Blob>);
+  }
 
-  void copy(Blob b, int length) native 'OracleBlob_copy';
+  void copy(Blob b, int length) {
+    final _lib = DynamicLibrary.open("liboracle.so");
 
-  int length() native 'OracleBlob_length';
+    final copy = _lib.lookupFunction<
+        Void Function(Pointer<Blob>, Pointer<Blob>, Int64),
+        void Function(Pointer<Blob>, Pointer<Blob>, int)>('OracleBlob_copy');
+    copy(this as Pointer<Blob>, b as Pointer<Blob>, length);
+  }
 
-  void trim(int length) native 'OracleBlob_trim';
+  int length() {
+    final _lib = DynamicLibrary.open("liboracle.so");
 
-  List<int> read(int amount, int offset) native 'OracleBlob_read';
+    final length = _lib.lookupFunction<Int64 Function(Pointer<Blob>),
+        int Function(Pointer<Blob>)>('OracleBlob_length');
+    return length(this as Pointer<Blob>);
+  }
 
-  int write(int amount, List<int> buffer, int offset) native 'OracleBlob_write';
+  void trim(int length) {
+final _lib = DynamicLibrary.open("liboracle.so");
 
-  //List<int> asBytes() native 'OracleBlob_asBytes';
+    final trim = _lib.lookupFunction<Void Function(Pointer<Blob>, Int64),
+        void Function(Pointer<Blob>, int)>('OracleBlob_trim');
+    trim(this as Pointer<Blob>, length);
+  }
 
-  //void _initSetBytes(List<int> bytes) native 'OracleBlob_initSetBytes';
+  List<int> read(int amount, int offset) {
+final _lib = DynamicLibrary.open("liboracle.so");
+
+    final read = _lib.lookupFunction<
+        Pointer<Uint8> Function(Pointer<Blob>, Int64, Int64),
+        Pointer<Uint8> Function(Pointer<Blob>, int, int)>('OracleBlob_read');
+    Pointer<Uint8> bytesPointer = read(this as Pointer<Blob>, amount, offset);
+    return [];
+    // Aqui você precisa implementar a lógica para converter o ponteiro em uma lista de inteiros
+    // ...
+  }
+
+  int write(int amount, List<int> buffer, int offset) {
+final _lib = DynamicLibrary.open("liboracle.so");
+
+    final write = _lib.lookupFunction<
+        Int64 Function(Pointer<Blob>, Int64, Pointer<Uint8>, Int64),
+        int Function(
+            Pointer<Blob>, int, Pointer<Uint8>, int)>('OracleBlob_write');
+    final pointer = allocate<Uint8>(count: buffer.length);
+    for (var i = 0; i < buffer.length; i++) {
+      pointer[i] = buffer[i];
+    }
+    int result = write(this as Pointer<Blob>, amount, pointer, offset);
+    free(pointer);
+    return result;
+  }
+
+  List<int> asBytes() {
+final _lib = DynamicLibrary.open("liboracle.so");
+
+    final asBytes = _lib.lookupFunction<Pointer<Uint8> Function(Pointer<Blob>),
+        Pointer<Uint8> Function(Pointer<Blob>)>('OracleBlob_asBytes');
+    Pointer<Uint8> bytesPointer = asBytes(this as Pointer<Blob>);
+    return [];
+    // Aqui você precisa implementar a lógica para converter o ponteiro em uma lista de inteiros
+    // ...
+  }
+
+  void _initSetBytes(List<int> bytes) {
+final _lib = DynamicLibrary.open("liboracle.so");
+
+    final initSetBytes = _lib.lookupFunction<
+        Void Function(Pointer<Blob>, Pointer<Uint8>, Int64),
+        void Function(
+            Pointer<Blob>, Pointer<Uint8>, int)>('OracleBlob_initSetBytes');
+    final pointer = allocate<Uint8>(count: bytes.length);
+    for (var i = 0; i < bytes.length; i++) {
+      pointer[i] = bytes[i];
+    }
+    initSetBytes(this as Pointer<Blob>, pointer, bytes.length);
+    free(pointer);
+  }
 }
 
-class Clob {
+base class Clob extends Struct{
   Clob._();
 
-  void append(Clob b) native 'OracleClob_append';
+  void append(Clob b) {
+    final _lib = DynamicLibrary.open("liboracle.so");
 
-  void copy(Clob b, int length) native 'OracleClob_copy';
+    final append = _lib.lookupFunction<
+        Void Function(Pointer<Clob>, Pointer<Clob>),
+        void Function(Pointer<Clob>, Pointer<Clob>)>('OracleClob_append');
+    append(this as Pointer<Clob>, b as Pointer<Clob>);
+  }
+  void copy(Clob b, int length) {
+    final _lib = DynamicLibrary.open("liboracle.so");
 
-  int length() native 'OracleClob_length';
+    final copy = _lib.lookupFunction<
+        Void Function(Pointer<Clob>, Pointer<Clob>, Int64),
+        void Function(Pointer<Clob>, Pointer<Clob>, int)>('OracleClob_copy');
+    copy(this as Pointer<Clob>, b as Pointer<Clob>, length);
+  }
 
-  void trim(int length) native 'OracleClob_trim';
+  int length() {
+    final _lib = DynamicLibrary.open("liboracle.so");
+
+    final length = _lib.lookupFunction<Int64 Function(Pointer<Clob>),
+        int Function(Pointer<Clob>)>('OracleClob_length');
+    return length(this as Pointer<Clob>);
+  }
+
+  void trim(int length) {
+    final _lib = DynamicLibrary.open("liboracle.so");
+
+    final trim = _lib.lookupFunction<Void Function(Pointer<Clob>, Int64),
+        void Function(Pointer<Clob>, int)>('OracleClob_trim');
+    trim(this as Pointer<Clob>, length);
+  }
 
   String read(int amount, int offset) {
     List<int> li = _readHelper(amount, offset);
-    return UTF8.decode(li);
+    return utf8.decode(li);
   }
 
-  List<int> _readHelper(int amount, int offset) native 'OracleClob_read';
+  List<int> _readHelper(int amount, int offset) {
+    final _lib = DynamicLibrary.open("liboracle.so");
+
+    final read = _lib.lookupFunction<
+        Pointer<Uint8> Function(Pointer<Clob>, Int64, Int64),
+        Pointer<Uint8> Function(Pointer<Clob>, int, int)>('OracleClob_read');
+    Pointer<Uint8> bytesPointer = read(this as Pointer<Clob>, amount, offset);
+    return [];
+    // Aqui você precisa implementar a lógica para converter o ponteiro em uma lista de inteiros
+    // ...
+  }
 
   int write(int amount, String str, int offset) {
-    List<int> li = UTF8.encode(str);
+    List<int> li = utf8.encode(str);
 
     return _writeHelper(amount, li, offset);
   }
 
-  int _writeHelper(int amount, List<int> buffer, int offset)
-      native 'OracleClob_write';
+  int _writeHelper(int amount, List<int> buffer, int offset){
+    final _lib = DynamicLibrary.open("liboracle.so");
+
+    final write = _lib.lookupFunction<
+        Int64 Function(Pointer<Clob>, Int64, Pointer<Uint8>, Int64),
+        int Function(
+            Pointer<Clob>, int, Pointer<Uint8>, int)>('OracleClob_write');
+    final pointer = allocate<Uint8>(count: buffer.length);
+    for (var i = 0; i < buffer.length; i++) {
+      pointer[i] = buffer[i];
+    }
+    int result = write(this as Pointer<Clob>, amount, pointer, offset);
+    free(pointer);
+    return result;
+  }
+      
 }
 
 class DataType {
@@ -903,9 +1027,21 @@ abstract class _Metadata {
       ParamType.values[getInt(_MetadataAttrs.ATTR_PTYPE)];
   DateTime getObjectTimestamp() => getTimestamp(_MetadataAttrs.ATTR_TIMESTAMP);
 
-  bool _getBoolean(int attrId) native 'OracleMetadata_getBoolean';
+  bool _getBoolean(int attrId) {
+    final _lib = DynamicLibrary.open("liboracle.so");
+    
+    final getBoolean = _lib.lookupFunction<Int64 Function(Pointer<_Metadata>, Int64),
+        int Function(Pointer<_Metadata>, int)>('OracleMetadata_getBoolean');
+    return getBoolean(this as Pointer<_Metadata>, attrId) == 1;
+  }
 
-  int _getInt(int attrId) native 'OracleMetadata_getInt';
+  int _getInt(int attrId) {
+    final _lib = DynamicLibrary.open("liboracle.so");
+
+    final getInt = _lib.lookupFunction<Int64 Function(Pointer<_Metadata>, Int64),
+        int Function(Pointer<_Metadata>, int)>('OracleMetadata_getInt');
+    return getInt(this as Pointer<_Metadata>, attrId);
+  };
 
   num _getNumber(int attrId) native 'OracleMetadata_getNumber';
 
