@@ -39,13 +39,13 @@ class Environment {
     init();
   }
 
-  Connection createConnection(
+  Pointer<NativeType> createConnection(
       String username, String password, String connStr) {
     final createConnection = _lib.lookupFunction<
         Pointer Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>),
         Pointer Function(Pointer<Utf8>, Pointer<Utf8>,
             Pointer<Utf8>)>('OracleEnvironment_createConnection');
-
+    final connection = Connection(username, password, connStr);
     return createConnection(username.toNativeUtf8(), password.toNativeUtf8(),
         connStr.toNativeUtf8());
   }
@@ -70,12 +70,19 @@ class Connection {
   String? _connectionString;
   String? _username;
   final _lib = DynamicLibrary.open('path_to_your_library');
+  late Pointer<NativeType> _nativeConnection;
+
   factory Connection(String username, String password, String connString) {
     var env = new Environment();
-    return env.createConnection(username, password, connString);
+    // Armazene o ponteiro para a conexão nativa
+    var nativeConnection = env.createConnection(username, password, connString);
+    return Connection._(nativeConnection);
   }
 
-  Connection._();
+  Connection._(this._nativeConnection);
+  factory Connection.fromConnection(Pointer<NativeType> nativeConnection) {
+    return Connection._(nativeConnection);
+  }
 
   void _bindArgs(Statement stmt, [List<Object>? args]) {
     if (args == null) {
@@ -421,6 +428,7 @@ class ResultSet {
         .asFunction<DartGetColumnListMetadata>();
 
     Pointer columnListPointer = getColumnListMetadata();
+    return [];
     // Aqui você precisa implementar a lógica para converter o ponteiro em uma lista de ColumnMetadata
     // ...
   }
@@ -484,6 +492,7 @@ class ResultSet {
         .asFunction<DartGetBytes>();
 
     Pointer<Uint8> bytesPointer = getBytes(index);
+    return [];
     // Aqui você precisa implementar a lógica para converter o ponteiro em uma lista de inteiros
     // ...
   }
@@ -582,18 +591,20 @@ class ResultSet {
 
 class BFile {
   final _lib = DynamicLibrary.open('path_to_your_library');
-  List<int> get bytes {
+  Pointer _pointer;
+
+  BFile(this._pointer);
+  List<int> bytes(int bytes) {
     final getBytes = _lib
         .lookup<NativeFunction<NativeGetBytes>>('OracleBFile_getBytes')
         .asFunction<DartGetBytes>();
 
-    Pointer<Uint8> bytesPointer = getBytes();
+    Pointer<Uint8> bytesPointer = getBytes(bytes);
     return [];
     // Aqui você precisa implementar a lógica para converter o ponteiro em uma lista de inteiros
     // ...
   }
 }
-
 
 base class Blob extends Struct {
   @Int64()
@@ -602,7 +613,7 @@ base class Blob extends Struct {
   Blob._();
 
   void append(Blob b) {
-final _lib = DynamicLibrary.open("liboracle.so");
+    final _lib = DynamicLibrary.open("liboracle.so");
     final append = _lib.lookupFunction<
         Void Function(Pointer<Blob>, Pointer<Blob>),
         void Function(Pointer<Blob>, Pointer<Blob>)>('OracleBlob_append');
@@ -627,7 +638,7 @@ final _lib = DynamicLibrary.open("liboracle.so");
   }
 
   void trim(int length) {
-final _lib = DynamicLibrary.open("liboracle.so");
+    final _lib = DynamicLibrary.open("liboracle.so");
 
     final trim = _lib.lookupFunction<Void Function(Pointer<Blob>, Int64),
         void Function(Pointer<Blob>, int)>('OracleBlob_trim');
@@ -635,7 +646,7 @@ final _lib = DynamicLibrary.open("liboracle.so");
   }
 
   List<int> read(int amount, int offset) {
-final _lib = DynamicLibrary.open("liboracle.so");
+    final _lib = DynamicLibrary.open("liboracle.so");
 
     final read = _lib.lookupFunction<
         Pointer<Uint8> Function(Pointer<Blob>, Int64, Int64),
@@ -647,7 +658,7 @@ final _lib = DynamicLibrary.open("liboracle.so");
   }
 
   int write(int amount, List<int> buffer, int offset) {
-final _lib = DynamicLibrary.open("liboracle.so");
+    final _lib = DynamicLibrary.open("liboracle.so");
 
     final write = _lib.lookupFunction<
         Int64 Function(Pointer<Blob>, Int64, Pointer<Uint8>, Int64),
@@ -663,7 +674,7 @@ final _lib = DynamicLibrary.open("liboracle.so");
   }
 
   List<int> asBytes() {
-final _lib = DynamicLibrary.open("liboracle.so");
+    final _lib = DynamicLibrary.open("liboracle.so");
 
     final asBytes = _lib.lookupFunction<Pointer<Uint8> Function(Pointer<Blob>),
         Pointer<Uint8> Function(Pointer<Blob>)>('OracleBlob_asBytes');
@@ -674,7 +685,7 @@ final _lib = DynamicLibrary.open("liboracle.so");
   }
 
   void _initSetBytes(List<int> bytes) {
-final _lib = DynamicLibrary.open("liboracle.so");
+    final _lib = DynamicLibrary.open("liboracle.so");
 
     final initSetBytes = _lib.lookupFunction<
         Void Function(Pointer<Blob>, Pointer<Uint8>, Int64),
@@ -689,7 +700,9 @@ final _lib = DynamicLibrary.open("liboracle.so");
   }
 }
 
-base class Clob extends Struct{
+base class Clob extends Struct {
+  @Int64()
+  external int someField;
   Clob._();
 
   void append(Clob b) {
@@ -700,6 +713,7 @@ base class Clob extends Struct{
         void Function(Pointer<Clob>, Pointer<Clob>)>('OracleClob_append');
     append(this as Pointer<Clob>, b as Pointer<Clob>);
   }
+
   void copy(Clob b, int length) {
     final _lib = DynamicLibrary.open("liboracle.so");
 
@@ -748,7 +762,7 @@ base class Clob extends Struct{
     return _writeHelper(amount, li, offset);
   }
 
-  int _writeHelper(int amount, List<int> buffer, int offset){
+  int _writeHelper(int amount, List<int> buffer, int offset) {
     final _lib = DynamicLibrary.open("liboracle.so");
 
     final write = _lib.lookupFunction<
@@ -763,7 +777,6 @@ base class Clob extends Struct{
     free(pointer);
     return result;
   }
-      
 }
 
 class DataType {
@@ -1012,7 +1025,21 @@ enum ParamType {
   NAME_VALUE
 }
 
-abstract class _Metadata {
+typedef GetNumberFunc = Double Function(Pointer<_Metadata>, Int32);
+typedef GetNumber = double Function(Pointer<_Metadata>, int);
+
+typedef GetStringFunc = Pointer<Utf8> Function(Pointer<_Metadata>, Int32);
+typedef GetString = Pointer<Utf8> Function(Pointer<_Metadata>, int);
+
+typedef GetTimestampFunc = Pointer<tm> Function(Pointer<_Metadata>, Int32);
+typedef GetTimestamp = Pointer<tm> Function(Pointer<_Metadata>, int);
+
+typedef GetUIntFunc = Uint32 Function(Pointer<_Metadata>, Int32);
+typedef GetUInt = int Function(Pointer<_Metadata>, int);
+
+base class _Metadata extends Struct {
+  @Int64()
+  external int someField;
   bool getBoolean(_MetadataAttrs attr) => _getBoolean(attr.value);
   int getInt(_MetadataAttrs attr) => _getInt(attr.value);
   num getNumber(_MetadataAttrs attr) => _getNumber(attr.value);
@@ -1029,8 +1056,9 @@ abstract class _Metadata {
 
   bool _getBoolean(int attrId) {
     final _lib = DynamicLibrary.open("liboracle.so");
-    
-    final getBoolean = _lib.lookupFunction<Int64 Function(Pointer<_Metadata>, Int64),
+
+    final getBoolean = _lib.lookupFunction<
+        Int64 Function(Pointer<_Metadata>, Int64),
         int Function(Pointer<_Metadata>, int)>('OracleMetadata_getBoolean');
     return getBoolean(this as Pointer<_Metadata>, attrId) == 1;
   }
@@ -1038,18 +1066,76 @@ abstract class _Metadata {
   int _getInt(int attrId) {
     final _lib = DynamicLibrary.open("liboracle.so");
 
-    final getInt = _lib.lookupFunction<Int64 Function(Pointer<_Metadata>, Int64),
+    final getInt = _lib.lookupFunction<
+        Int64 Function(Pointer<_Metadata>, Int64),
         int Function(Pointer<_Metadata>, int)>('OracleMetadata_getInt');
     return getInt(this as Pointer<_Metadata>, attrId);
-  };
+  }
 
-  num _getNumber(int attrId) native 'OracleMetadata_getNumber';
+  num _getNumber(int attrId) {
+    final _lib = DynamicLibrary.open("liboracle.so");
+    final getNumber = _lib.lookupFunction<
+        Double Function(Pointer<_Metadata>, Int32),
+        double Function(Pointer<_Metadata>, int)>('OracleMetadata_getNumber');
+    return getNumber(this as Pointer<_Metadata>, attrId);
+  }
 
-  String _getString(int attrId) native 'OracleMetadata_getString';
+  String _getString(int attrId) {
+    final _lib = DynamicLibrary.open("liboracle.so");
+    final getString = _lib.lookupFunction<
+        Pointer<Utf8> Function(Pointer<_Metadata>, Int32),
+        Pointer<Utf8> Function(
+            Pointer<_Metadata>, int)>('OracleMetadata_getString');
+    return getString(this as Pointer<_Metadata>, attrId).toDartString();
+  }
 
-  DateTime _getTimestamp(int attrId) native 'OracleMetadata_getTimestamp';
+  DateTime _getTimestamp(int attrId) {
+    final _lib = DynamicLibrary.open("liboracle.so");
+    final getTimestamp = _lib.lookupFunction<
+        Pointer<tm> Function(Pointer<_Metadata>, Int32),
+        Pointer<tm> Function(
+            Pointer<_Metadata>, int)>('OracleMetadata_getTimestamp');
+    final tmStruct = getTimestamp(this as Pointer<_Metadata>, attrId).ref;
+    return DateTime(tmStruct.tm_year + 1900, tmStruct.tm_mon + 1,
+        tmStruct.tm_mday, tmStruct.tm_hour, tmStruct.tm_min, tmStruct.tm_sec);
+  }
 
-  int _getUInt(int attrId) native 'OracleMetadata_getUInt';
+  int _getUInt(int attrId) {
+    final _lib = DynamicLibrary.open("liboracle.so");
+    final getUInt = _lib.lookupFunction<
+        Uint32 Function(Pointer<_Metadata>, Int32),
+        int Function(Pointer<_Metadata>, int)>('OracleMetadata_getUInt');
+    return getUInt(this as Pointer<_Metadata>, attrId);
+  }
+}
+
+base class tm extends Struct {
+  @Int32()
+  external int tm_sec;
+
+  @Int32()
+  external int tm_min;
+
+  @Int32()
+  external int tm_hour;
+
+  @Int32()
+  external int tm_mday;
+
+  @Int32()
+  external int tm_mon;
+
+  @Int32()
+  external int tm_year;
+
+  @Int32()
+  external int tm_wday;
+
+  @Int32()
+  external int tm_yday;
+
+  @Int32()
+  external int tm_isdst;
 }
 
 class ColumnMetadata extends _Metadata {
